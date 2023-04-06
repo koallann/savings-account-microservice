@@ -1,5 +1,7 @@
 CREATE DATABASE savings_account;
 
+\c savings_account;
+
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE account (
