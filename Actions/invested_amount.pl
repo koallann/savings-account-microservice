@@ -1,31 +1,29 @@
 use LWP::Simple;
 use LWP::UserAgent;
+use JSON;
 
 sub InvestValue {
     my $ua = LWP::UserAgent->new;
-    my $server_endpoint = "http://localhost:8080/user";
+    my $server_endpoint = "https://ef7f-2804-29b8-511b-aa0-545c-654-b549-84cc.ngrok-free.app/user/";
 
     # HTTP request header fields
-    my $req = HTTP::Request->new(GET => $server_endpoint);
+    my $req = HTTP::Request->new(POST => $server_endpoint);
     $req->header('content-type' => 'application/json');
-    $req->header('x-auth-token' => 'token');
+    $req->header( 'Accept'      => 'application/json');
 
-    my $post_data = '{ 
-        "type": "poupança",
-        "action": "investir_valor",
-        "content": {
-            "user": 001,
-            "value": 200.0
-        } 
+    my $post_data = '{
+        "name": "test",
+        "email": "test@test.com",
+        "password": "null"
     }';
+
     $req->content($post_data);
     
     my $resp = $ua->request($req);
     if ($resp->is_success) {
         my $message = $resp->decoded_content;
-        print "Received reply: $messagen";
 
-        return $resp
+        print $message;
     }
     else {
         print "HTTP error code: ", $resp->code, "n";
