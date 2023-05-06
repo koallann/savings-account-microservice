@@ -31,7 +31,7 @@ my $CHECK = "
 
 
 my $sth = $dbh->do($CHECK);  
-if ($sth != 3)
+if ($sth != 2)
 {
 	my $SQL = "
 		CREATE TABLE account (
