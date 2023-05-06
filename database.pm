@@ -26,7 +26,7 @@ $dbh -> trace(1, 'tracelog.txt');
 my $CHECK = "
 	SELECT * 
 	FROM INFORMATION_SCHEMA.TABLES
-	WHERE table_name like 'transaction' or table_name like 'account' or table_name like 'yield_index'
+	WHERE table_name like 'transaction' or table_name like 'account'
 ";
 
 
