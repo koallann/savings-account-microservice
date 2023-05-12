@@ -4,13 +4,12 @@ use strict;
 
 $| = 1;
 
-use threads;
-
+use DBI;
 use HTTP::Daemon;
 use HTTP::Response;
 use HTTP::Status;
-
 use JSON;
+use threads;
 
 use constant {
     TYPE_SERVER => "savings_account",
@@ -19,6 +18,23 @@ use constant {
     ACTION_DEPOSIT => "deposit",
     ACTION_WITHDRAW => "withdraw",
 };
+
+# creating database
+
+my $dbname = 'savings_account';
+my $host = 'localhost';
+my $port = 5432;
+my $username = 'clp';
+my $password = '123456';
+
+my $database = DBI->connect(
+    "dbi:Pg:dbname=$dbname;host=$host;port=$port",
+    $username,
+    $password,
+    {AutoCommit => 0, RaiseError => 1},
+) or die $DBI::errstr;
+
+$database->trace(1, "tracelog.txt");
 
 # creating server
 
