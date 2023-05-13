@@ -5,18 +5,17 @@ CREATE DATABASE savings_account;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE account (
-	id serial,
-	user_id uuid UNIQUE NOT NULL,
+	user_uuid uuid,
 	balance money NOT NULL,
-	PRIMARY KEY (id)
+	PRIMARY KEY (user_uuid)
 );
 
 CREATE TABLE transaction (
 	id bigserial,
-	account_id serial NOT NULL,
+	user_uuid uuid NOT NULL,
 	type CHAR NOT NULL,
 	amount money NOT NULL,
-	extra json,
+	timestamp TIMESTAMP DEFAULT current_timestamp,
 	PRIMARY KEY (id),
-	FOREIGN KEY (account_id) REFERENCES account (id)
+	FOREIGN KEY (user_uuid) REFERENCES account (user_uuid)
 );

@@ -18,15 +18,13 @@ use constant {
     ACTION_CHECK => "check",
     ACTION_DEPOSIT => "deposit",
     ACTION_WITHDRAW => "withdraw",
+
+    DB_NAME => "savings_account",
+    DB_HOST => "localhost",
+    DB_PORT => 5432,
+    DB_USER => "clp",
+    DB_PASS => "123456",
 };
-
-# creating database
-
-my $dbname = 'savings_account';
-my $host = 'localhost';
-my $port = 5432;
-my $username = 'clp';
-my $password = '123456';
 
 # creating server
 
@@ -53,7 +51,10 @@ sub handle_connection {
         $conn->send_response($res);
         $conn->close();
     } catch {
-        my $res = create_bad_response("Unexpected error: $_");
+        my $res = create_response(
+            RC_INTERNAL_SERVER_ERROR,
+            {"message" => "Unexpected error: $_"},
+        );
         $conn->send_response($res);
         $conn->close();
     }
@@ -106,6 +107,8 @@ sub handle_action {
     return $res;
 }
 
+# response helpers
+
 sub create_bad_response {
     my ($message) = @_;
 
@@ -126,12 +129,14 @@ sub create_response {
     );
 }
 
+# actions handling
+
 sub on_action_check {
     my ($content) = @_;
     my $user_uuid = $content->{"user_uuid"};
 
-    my $query = "SELECT balance::numeric FROM account WHERE user_id::text = '$user_uuid'";
-    my @result = execute_query($query);
+    my $query = "SELECT balance::numeric FROM account WHERE user_uuid::text = '$user_uuid'";
+    my @result = query_select($query);
 
     if (scalar @result > 0) {
         my $balance = $result[0] + 0; # casting to number
@@ -143,7 +148,33 @@ sub on_action_check {
 
 sub on_action_deposit {
     my ($content) = @_;
-    return create_bad_response("not implemented");
+    my $user_uuid = $content->{"user_uuid"};
+
+    my $value = $content->{"value"};
+    if ($value <= 0) {
+        return create_bad_response("Value must be greater than 0.");
+    }
+
+    create_account_if_not_exists($user_uuid);
+
+    my $balance_query = "UPDATE account SET balance = balance::numeric + $value WHERE user_uuid::text = '$user_uuid'";
+    if (query_do($balance_query) != 1) {
+        return create_response(
+            RC_INTERNAL_SERVER_ERROR,
+            {"message" => "Cannot update account balance."},
+        );
+    }
+
+    my $transaction_query = "INSERT INTO transaction (user_uuid, type, amount) VALUES ('$user_uuid', 'd', $value)";
+    if (query_do($transaction_query) != 1) {
+        return create_response(
+            RC_INTERNAL_SERVER_ERROR,
+            {"message" => "Cannot create account transaction."},
+        );
+    }
+
+    # TODO: rollback if some operation fails
+    return create_response(RC_OK, {"result" => "OK"});
 }
 
 sub on_action_withdraw {
@@ -151,16 +182,38 @@ sub on_action_withdraw {
     return create_bad_response("not implemented");
 }
 
-sub execute_query {
-    my ($query) = @_;
+sub create_account_if_not_exists {
+    my ($user_uuid) = @_;
 
+    my $exists_query = "SELECT EXISTS(SELECT 1 FROM account WHERE user_uuid::text = '$user_uuid')";
+    my @exists_result = query_select($exists_query);
+    if ($exists_result[0] eq 1) {
+        return;
+    }
+
+    my $create_query = "INSERT INTO account (user_uuid, balance) VALUES ('$user_uuid', 0)";
+    if (query_do($create_query) != 1) {
+        die "Cannot create user account.";
+    }
+}
+
+# database helpers
+
+sub create_db_connection {
     my $db = DBI->connect(
-        "dbi:Pg:dbname=$dbname;host=$host;port=$port",
-        $username,
-        $password,
-        {AutoCommit => 0, RaiseError => 1},
+        "dbi:Pg:dbname=@{[DB_NAME]};host=@{[DB_HOST]};port=@{[DB_PORT]}",
+        DB_USER,
+        DB_PASS,
+        {AutoCommit => 1, RaiseError => 1},
     ) or die $DBI::errstr;
 
+    return $db;
+}
+
+sub query_select {
+    my ($query) = @_;
+
+    my $db = create_db_connection();
     my $stmt = $db->prepare($query);
     $stmt->execute();
 
@@ -173,4 +226,15 @@ sub execute_query {
     $db->disconnect();
 
     return @result;
+}
+
+sub query_do {
+    my ($query) = @_;
+
+    my $db = create_db_connection();
+    my $rows_affected = $db->do($query);
+
+    $db->disconnect();
+
+    return $rows_affected;
 }
