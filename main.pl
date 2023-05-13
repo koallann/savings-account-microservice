@@ -102,11 +102,11 @@ sub handle_action {
     my $res;
 
     if ($action eq ACTION_CHECK) {
-        $res = create_bad_response("ACTION_CHECK not implemented.");
+        $res = on_action_check($content);
     } elsif ($action eq ACTION_DEPOSIT) {
-        $res = create_bad_response("ACTION_DEPOSIT not implemented.");
+        $res = on_action_deposit($content);
     } elsif ($action eq ACTION_WITHDRAW) {
-        $res = create_bad_response("ACTION_WITHDRAW not implemented.");
+        $res = on_action_withdraw($content);
     } else {
         $res = create_bad_response("Invalid action.");
     }
@@ -122,4 +122,19 @@ sub create_bad_response {
         ["Content-Type" => "application/json"],
         encode_json({"message" => $message}),
     );
+}
+
+sub on_action_check {
+    my ($content) = @_;
+    return create_bad_response("not implemented");
+}
+
+sub on_action_deposit {
+    my ($content) = @_;
+    return create_bad_response("not implemented");
+}
+
+sub on_action_withdraw {
+    my ($content) = @_;
+    return create_bad_response("not implemented");
 }
