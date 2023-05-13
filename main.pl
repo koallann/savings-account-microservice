@@ -28,15 +28,6 @@ my $port = 5432;
 my $username = 'clp';
 my $password = '123456';
 
-my $database = DBI->connect(
-    "dbi:Pg:dbname=$dbname;host=$host;port=$port",
-    $username,
-    $password,
-    {AutoCommit => 0, RaiseError => 1},
-) or die $DBI::errstr;
-
-$database->trace(1, "tracelog.txt");
-
 # creating server
 
 my $server = HTTP::Daemon->new(
@@ -44,6 +35,8 @@ my $server = HTTP::Daemon->new(
     LocalPort => 8000,
     ReuseAddr => 1,
 ) or die "Error creating server!";
+
+# TODO: disconnect from database when server stops
 
 # running server
 
@@ -116,17 +109,36 @@ sub handle_action {
 sub create_bad_response {
     my ($message) = @_;
 
-    return HTTP::Response->new(
+    return create_response(
         RC_BAD_REQUEST,
-        status_message(RC_BAD_REQUEST),
+        {"message" => $message},
+    );
+}
+
+sub create_response {
+    my ($code, $body) = @_;
+
+    return HTTP::Response->new(
+        $code,
+        status_message($code),
         ["Content-Type" => "application/json"],
-        encode_json({"message" => $message}),
+        encode_json($body),
     );
 }
 
 sub on_action_check {
     my ($content) = @_;
-    return create_bad_response("not implemented");
+    my $user_uuid = $content->{"user_uuid"};
+
+    my $query = "SELECT balance::numeric FROM account WHERE user_id::text = '$user_uuid'";
+    my @result = execute_query($query);
+
+    if (scalar @result > 0) {
+        my $balance = $result[0] + 0; # casting to number
+        return create_response(RC_OK, {"balance" => $balance});
+    } else {
+        return create_response(RC_NOT_FOUND, {"message" => "This user doesn't exists."});
+    }
 }
 
 sub on_action_deposit {
@@ -137,4 +149,28 @@ sub on_action_deposit {
 sub on_action_withdraw {
     my ($content) = @_;
     return create_bad_response("not implemented");
+}
+
+sub execute_query {
+    my ($query) = @_;
+
+    my $db = DBI->connect(
+        "dbi:Pg:dbname=$dbname;host=$host;port=$port",
+        $username,
+        $password,
+        {AutoCommit => 0, RaiseError => 1},
+    ) or die $DBI::errstr;
+
+    my $stmt = $db->prepare($query);
+    $stmt->execute();
+
+    my @result;
+    while (my @row = $stmt->fetchrow_array()) {
+        push @result, @row;
+    }
+
+    $stmt->finish();
+    $db->disconnect();
+
+    return @result;
 }
