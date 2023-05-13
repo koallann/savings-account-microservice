@@ -10,6 +10,7 @@ use HTTP::Response;
 use HTTP::Status;
 use JSON;
 use threads;
+use Try::Tiny;
 
 use constant {
     TYPE_SERVER => "savings_account",
@@ -54,15 +55,19 @@ while (my $conn = $server->accept()) {
 
 sub handle_connection {
     my ($conn) = @_;
-    my $res = handle_request($conn->get_request());
-
-    $conn->send_response($res);
-    $conn->close();
+    try {
+        my $res = handle_request($conn->get_request());
+        $conn->send_response($res);
+        $conn->close();
+    } catch {
+        my $res = create_bad_response("Unexpected error: $_");
+        $conn->send_response($res);
+        $conn->close();
+    }
 }
 
 sub handle_request {
     my ($req) = @_;
-    sleep(5);
 
     # allow GET only
     my $method = $req->method;
@@ -97,11 +102,11 @@ sub handle_action {
     my $res;
 
     if ($action eq ACTION_CHECK) {
-
+        $res = create_bad_response("ACTION_CHECK not implemented.");
     } elsif ($action eq ACTION_DEPOSIT) {
-
+        $res = create_bad_response("ACTION_DEPOSIT not implemented.");
     } elsif ($action eq ACTION_WITHDRAW) {
-
+        $res = create_bad_response("ACTION_WITHDRAW not implemented.");
     } else {
         $res = create_bad_response("Invalid action.");
     }
