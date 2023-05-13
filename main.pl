@@ -19,6 +19,9 @@ use constant {
     ACTION_DEPOSIT => "deposit",
     ACTION_WITHDRAW => "withdraw",
 
+    TRANSACTION_TYPE_DEPOSIT => "d",
+    TRANSACTION_TYPE_WITHDRAW => "w",
+
     DB_NAME => "savings_account",
     DB_HOST => "localhost",
     DB_PORT => 5432,
@@ -150,14 +153,47 @@ sub on_action_deposit {
     my ($content) = @_;
     my $user_uuid = $content->{"user_uuid"};
 
-    my $value = $content->{"value"};
-    if ($value <= 0) {
-        return create_bad_response("Value must be greater than 0.");
+    my $amount = $content->{"amount"};
+    if ($amount <= 0) {
+        return create_bad_response("Amount must be greater than 0.");
     }
+
+    add_to_balance($user_uuid, TRANSACTION_TYPE_DEPOSIT, $amount);
+
+    return create_response(RC_OK, {"result" => "OK"});
+}
+
+sub on_action_withdraw {
+    my ($content) = @_;
+    my $user_uuid = $content->{"user_uuid"};
+
+    my $amount = $content->{"amount"};
+    if ($amount <= 0) {
+        return create_bad_response("Amount must be greater than 0.");
+    }
+
+    my $balance_query = "SELECT balance::numeric FROM account WHERE user_uuid::text = '$user_uuid'";
+    my @balance_result = query_select($balance_query);
+    if (scalar @balance_result == 0) {
+        return create_response(RC_NOT_FOUND, {"message" => "This user doesn't exists."});
+    }
+
+    my $balance = $balance_result[0] + 0;
+    if ($balance < $amount) {
+        return create_bad_response("Cannot withdraw an amount greater than balance.");
+    }
+
+    add_to_balance($user_uuid, TRANSACTION_TYPE_WITHDRAW, $amount * -1);
+
+    return create_response(RC_OK, {"result" => "OK"});
+}
+
+sub add_to_balance {
+    my ($user_uuid, $type, $amount) = @_;
 
     create_account_if_not_exists($user_uuid);
 
-    my $balance_query = "UPDATE account SET balance = balance::numeric + $value WHERE user_uuid::text = '$user_uuid'";
+    my $balance_query = "UPDATE account SET balance = balance::numeric + $amount WHERE user_uuid::text = '$user_uuid'";
     if (query_do($balance_query) != 1) {
         return create_response(
             RC_INTERNAL_SERVER_ERROR,
@@ -165,7 +201,8 @@ sub on_action_deposit {
         );
     }
 
-    my $transaction_query = "INSERT INTO transaction (user_uuid, type, amount) VALUES ('$user_uuid', 'd', $value)";
+    my $abs_amount = abs($amount);
+    my $transaction_query = "INSERT INTO transaction (user_uuid, type, amount) VALUES ('$user_uuid', '$type', $abs_amount)";
     if (query_do($transaction_query) != 1) {
         return create_response(
             RC_INTERNAL_SERVER_ERROR,
@@ -175,11 +212,6 @@ sub on_action_deposit {
 
     # TODO: rollback if some operation fails
     return create_response(RC_OK, {"result" => "OK"});
-}
-
-sub on_action_withdraw {
-    my ($content) = @_;
-    return create_bad_response("not implemented");
 }
 
 sub create_account_if_not_exists {
