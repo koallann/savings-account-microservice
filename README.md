@@ -23,13 +23,11 @@ A savings account microservice written in Perl to compose a banking system.
     > CREATE USER clp
     > ALTER USER clp WITH ENCRYPTED PASSWORD '123456';
 
-3. Grant permissions on database to the user:
+3. Grant permissions on database, tables and sequences to the user:
     > GRANT ALL PRIVILEGES ON DATABASE savings_account TO clp;
-
-4. Grant permissions on all tables to the user:
+    
     > GRANT ALL ON ALL TABLES TO clp;
-
-5. Grant permissions on sequences to the user:
+    
     > GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO clp;
 
 ## Run app
